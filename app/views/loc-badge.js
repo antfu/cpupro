@@ -5,11 +5,21 @@ discovery.view.define('loc-badge', {
     whenData: 'text',
     content: 'html:text.split(/:/).join(`<span class="delim">:</span>`)',
     postRender(el, _, data) {
-        if (data.module.path && data.module.path.match(/^\/|file:\/\/|[a-z]:/i)) {
-            const query = new URLSearchParams();
-            query.set('file', data.module.path + data.text);
-            el.target = '_blank';
-            el.href = 'https://localfile.link?' + query;
+        let useProtocol = false;
+
+        if (data.module.path && data.module.path.match(/^(?:\/|[a-z]:|file:\/\/)/i)) {
+            const filepath = data.module.path + data.text;
+            if (window.handleOpenInEditor) {
+                window.handleOpenInEditor(el, filepath);
+            }
+            if (useProtocol) {
+                el.href = 'localfile://' + filepath;
+            } else {
+                el.target = '_blank';
+                el.href = 'https://localfile.link?' + new URLSearchParams({
+                    file: filepath
+                }).toString();
+            }
         }
     }
 }, { tag: false });
