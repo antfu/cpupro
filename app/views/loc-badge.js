@@ -7,7 +7,7 @@ discovery.view.define('loc-badge', {
     postRender(el, _, data) {
         if (data.module.path && data.module.path.match(/^\/|file:\/\/|[a-z]:/i)) {
             const query = new URLSearchParams();
-            query.set('file', data.module.path);
+            query.set('file', data.module.path + data.text);
             el.target = '_blank';
             el.href = 'https://localfile.link?' + query;
         }
