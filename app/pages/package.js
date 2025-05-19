@@ -1,97 +1,128 @@
-const pageContent = {
-    content: [
-        {
-            view: 'page-header',
-            prelude: [
-                'badge{ className: "type-badge", text: "Package" }',
-                'badge{ className: "category-badge", text: category.name, href: category.marker().href, color: category.name.color() }'
-            ],
-            content: 'h1:name'
-        },
+import { callFramesCol, sessionExpandState, timingCols } from './common.js';
 
-        {
-            view: 'subject-with-nested-timeline',
-            data: '{ subject: @, tree: #.data.packagesTree }'
-        },
+const pageContent = [
+    {
+        view: 'page-header',
+        prelude: [
+            'badge{ className: "type-badge", text: "Package" }',
+            'badge{ className: "category-badge", text: category.name, href: category.marker().href, color: category.name.color() }'
+        ],
+        content: 'h1:name'
+    },
 
-        {
-            view: 'update-on-timings-change',
-            timings: '=#.data.packagesTimingsFiltered',
-            content: {
-                view: 'page-indicator-timings',
-                data: `{
-                    full: #.data.packagesTimings.entries[=>entry = @],
-                    filtered: #.data.packagesTimingsFiltered.entries[=>entry = @]
-                }`
+    {
+        view: 'subject-with-nested-timeline',
+        data: '{ subject: @, tree: #.currentProfile.packagesTree }'
+    },
+
+    {
+        view: 'update-on-timings-change',
+        timings: '=#.currentProfile.packagesTimingsFiltered',
+        content: `page-indicator-timings:{
+            full: #.currentProfile.packagesTimings.entries[=>entry = @],
+            filtered: #.currentProfile.packagesTimingsFiltered.entries[=>entry = @]
+        }`
+    },
+
+    {
+        view: 'expand',
+        ...sessionExpandState('package-nested-time-distribution', true),
+        className: 'trigger-outside',
+        header: [
+            'text:"Nested time distribution"',
+            { view: 'block', className: 'text-divider' },
+            {
+                view: 'update-on-timings-change',
+                timings: '=#.currentProfile.packagesTimingsFiltered',
+                content: 'duration:#.currentProfile.packagesTimingsFiltered.entries[=>entry=@].nestedTime'
             }
-        },
+        ],
+        content: `nested-timings-tree:{
+            subject: @,
+            tree: #.currentProfile.packagesTree,
+            timings: #.currentProfile.packagesTimingsFiltered
+        }`
+    },
 
-        {
-            view: 'expand',
-            expanded: true,
-            className: 'trigger-outside',
-            header: 'text:"Nested time distribution"',
-            content: 'nested-timings-tree:{ subject: @, tree: #.data.packagesTree, timings: #.data.packagesTimingsFiltered }'
-        },
-
-        {
-            view: 'expand',
-            expanded: true,
-            className: 'trigger-outside',
-            header: [
-                'text:"Modules "',
-                { view: 'pill-badge', content: {
-                    view: 'update-on-timings-change',
-                    timings: '=#.data.modulesTimingsFiltered',
-                    content: 'text-numeric:#.data.modulesTimingsFiltered.entries.[totalTime and entry.package = @].size()'
-                } }
-            ],
+    {
+        view: 'expand',
+        ...sessionExpandState('package-modules', true),
+        className: 'trigger-outside',
+        header: [
+            'text:"Modules "',
+            {
+                view: 'update-on-timings-change',
+                data: '#.currentProfile.modulesTimingsFiltered.entries.[entry.package = @]',
+                timings: '=#.currentProfile.modulesTimingsFiltered',
+                content: 'sampled-count-total{ count(=> totalTime?), total: size() }'
+            }
+        ],
+        content: {
+            view: 'content-filter',
+            data: `
+                #.currentProfile.callFramesTimingsFiltered.entries
+                    .[entry.package = @]
+                    .group(=> entry.module)
+                    .zip(=> key, #.currentProfile.modulesTimingsFiltered.entries, => entry)
+                    .({ module: right, name: right.entry | packageRelPath or name, callFrames: left.value })
+            `,
+            className: 'table-content-filter',
             content: {
-                view: 'content-filter',
-                className: 'table-content-filter',
+                view: 'update-on-timings-change',
+                data: '.[name ~= #.filter]',
+                timings: '=#.currentProfile.modulesTimingsFiltered',
                 content: {
-                    view: 'update-on-timings-change',
-                    timings: '=#.data.packagesTimingsFiltered',
-                    content: {
-                        view: 'table',
-                        data: '#.data.modulesTimingsFiltered.entries.[totalTime and entry.package = @ and entry.name ~= #.filter].sort(selfTime desc, totalTime desc)',
-                        cols: [
-                            { header: 'Self time', sorting: 'selfTime desc, totalTime desc', content: 'duration:{ time: selfTime, total: #.data.totalTime }' },
-                            { header: 'Nested time', sorting: 'nestedTime desc, totalTime desc', content: 'duration:{ time: nestedTime, total: #.data.totalTime }' },
-                            { header: 'Total time', sorting: 'totalTime desc, selfTime desc', content: 'duration:{ time: totalTime, total: #.data.totalTime }' },
-                            { header: 'Module', sorting: 'entry.name ascN', content: 'module-badge:entry' },
-                            { header: 'Functions', data: 'entry.functions' }
-                            // { header: 'Histogram', content: {
-                            //     view: 'timeline-segments-bin',
-                            //     bins: '=#.data.modulesTree.binCalls(entry, 100)',
-                            //     max: '=#.data.totalTime / 100',
-                            //     binsMax: true,
-                            //     color: '=entry.category.name.color()',
-                            //     height: 22
-                            // } }
-                        ]
-                    }
+                    view: 'table',
+                    data: `
+                        .({
+                            ...,
+                            selfTime: module.selfTime,
+                            nestedTime: module.nestedTime,
+                            totalTime: module.totalTime
+                        })
+                        .sort(selfTime desc, totalTime desc)
+                    `,
+                    cols: [
+                        ...timingCols,
+                        {
+                            header: 'Module',
+                            className: 'subject-name',
+                            sorting: 'name ascN',
+                            content: 'module-badge:module.entry'
+                        },
+                        callFramesCol('callFrames.sort(selfTime desc, totalTime desc, entry.name ascN)')
+                        // { header: 'Histogram', content: {
+                        //     view: 'timeline-segments-bin',
+                        //     bins: '=#.data.modulesTree.binCalls(entry, 100)',
+                        //     max: '=#.data.totalTime / 100',
+                        //     binsMax: true,
+                        //     color: '=entry.category.name.color()',
+                        //     height: 22
+                        // } }
+                    ]
                 }
             }
-        },
-
-        {
-            view: 'flamechart-expand',
-            tree: '=#.data.packagesTree',
-            timings: '=#.data.packagesTreeTimingsFiltered',
-            value: '='
         }
-    ]
-};
+    },
+
+    {
+        view: 'flamechart-expand',
+        ...sessionExpandState('package-flame-graphs', true),
+        tree: '=#.currentProfile.packagesTree',
+        timings: '=#.currentProfile.packagesTreeTimingsFiltered',
+        value: '='
+    }
+];
 
 discovery.page.define('package', {
     view: 'switch',
-    data: 'packages[=>id = +#.id]',
+    context: '{ ...#, currentProfile }',
+    data: 'currentProfile.packages[=>id = +#.id]',
     content: [
         { when: 'no $', content: {
             view: 'alert-warning',
             content: 'md:"No package with id \\"{{#.id}}\\" is found\\n\\n[Back to index page](#)"'
         } },
-        pageContent
+        { content: pageContent }
     ]
 });

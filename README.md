@@ -19,7 +19,7 @@ Supported formats:
 
 ### Scenario #1 – A viewer for CPU profiles
 
-Head to the [viewer on GitHub pages](https://lahmatiy.github.io/cpupro/), open a file in one of supported formats or drop it on the page.
+Head to the [viewer on GitHub pages](https://discoveryjs.github.io/cpupro/), open a file in one of supported formats or drop it on the page.
 
 <img width="1267" alt="Demo" src="https://github.com/lahmatiy/cpupro/assets/270491/ea4d54b7-8d37-456a-8db3-628a1da7df3e">
 
@@ -35,7 +35,7 @@ To use CLI install `cpupro` globally using `npm install -g cpupro`, or use `npx 
   ```
 - open viewer with `test.cpuprofile` data embedded:
   ```
-  cpurpro test.cpuprofile
+  cpupro test.cpuprofile
   ```
 - open viewer with data embedded from `stdin`:
   ```
@@ -45,6 +45,9 @@ To use CLI install `cpupro` globally using `npm install -g cpupro`, or use `npx 
   cat test.cpuprofile | cpupro -
   ```
 - get usage information:
+  ```
+  cpupro -h
+  ```
   ```
   Usage:
   
@@ -92,6 +95,17 @@ const profile = profiler.profile();
 
 // end profiling and open a report in a browser
 profile.profileEnd().openReport();
+```
+
+An alternative approach is to invoke actions such as writeToFile(), writeJsonxlToFile(), writeReport(), and openReport() at the start of profiling. These actions will be executed upon calling profileEnd() or upon process exit if profileEnd() is not explicitly invoked:
+
+```js
+const profiler = require('cpupro');
+
+profiler.profile()
+  .writeToFile('./path/to/demo.cpuprofile');
+
+// calling profileEnd() is not necessary if a CPU profile should be dumped to a file upon process exit
 ```
 
 ### Scenario #4 – A preload module for Node.js scripts

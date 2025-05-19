@@ -1,12 +1,15 @@
-import { convertParentIntoChildrenIfNeeded, isCPUProfile } from './formats/cpuprofile.js';
+import { convertParentIntoChildrenIfNeeded, isCPUProfile, unrollHeadToNodesIfNeeded, unwrapSamplesIfNeeded } from './formats/cpuprofile.js';
 import { extractFromDevToolsEnhancedTraces, isDevToolsEnhancedTraces } from './formats/chromium-devtools-enhanced-traces.js';
 import { extractFromChromiumPerformanceProfile, isChromiumPerformanceProfile } from './formats/chromium-performance-profile.js';
-import { convertV8LogIntoCpuprofile, isV8Log } from './formats/v8-proflog.js';
-import { V8CpuProfileCpuproExtensions } from './types.js';
+import { convertV8LogIntoCpuProfile, isV8LogProfile } from './formats/v8-log-processed.js';
+import type { V8CpuProfile, V8CpuProfileCpuproExtensions, V8CpuProfileSet } from './types.js';
+import { V8LogProfile } from './formats/v8-log-processed/types.js';
+import { FEATURE_MULTI_PROFILES } from './const.js';
 
 export const supportedFormats = [
+    '* [V8 log](https://v8.dev/docs/profile) (.log)',
+    '* [V8 log preprocessed](https://v8.dev/docs/profile#web-ui-for---prof) with --preprocess (.json)',
     '* [V8 CPU profile](https://nodejs.org/docs/latest/api/cli.html#--cpu-prof) (.cpuprofile)',
-    '* [V8 log](https://v8.dev/docs/profile) preprocessed with [--preprocess](https://v8.dev/docs/profile#web-ui-for---prof) (.json)',
     '* [Chromium Performance Profile](https://developer.chrome.com/docs/devtools/performance/reference#save) (.json)',
     '* [Edge Enhanced Performance Traces](https://learn.microsoft.com/en-us/microsoft-edge/devtools-guide-chromium/experimental-features/share-traces) (.devtools)'
 ];
@@ -17,8 +20,25 @@ export const supportedFormatsText = supportedFormats
 //     return data && Array.isArray(data.nodes) && Array.isArray(data.profiles);
 // }
 
-export function convertValidate(data, rejectData: (reason: string, view?: unknown) => void) {
+// type InputProfile =
+//     | DevToolsEnchandedTraceEventsProfile
+//     | ChromiumTraceEventsProfile
+//     | V8LogProfile
+//     | V8CpuProfile;
+// type Input =
+//     | InputProfile
+//     | InputProfile[]
+//     | {
+//         profiles: InputProfile[]
+//     };
+type InputProfiles = {
+    indexToView?: number;
+    profiles: (V8LogProfile | V8CpuProfile)[];
+}
+
+export function extractAndValidate(data: unknown, rejectData: (reason: string, view?: unknown) => void) {
     let extensions: V8CpuProfileCpuproExtensions = {};
+    let inputProfiles: InputProfiles | null = null;
 
     data = data || {};
 
@@ -27,51 +47,71 @@ export function convertValidate(data, rejectData: (reason: string, view?: unknow
 
         data = traceEvents;
         extensions = {
-            runtime,
-            scripts,
-            executionContexts
+            _runtime: runtime,
+            _scripts: scripts,
+            _executionContexts: executionContexts
         };
     }
 
     // see https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview#heading=h.lc5airzennvk
     if (isChromiumPerformanceProfile(data)) {
-        const result = extractFromChromiumPerformanceProfile(data);
+        inputProfiles = extractFromChromiumPerformanceProfile(data);
+    } else if (Array.isArray(data)) {
+        // in case input is array of { profile } object
+        const profiles = data.map(entry =>
+            'profile' in entry && entry.profile ? entry.profile : entry
+        );
 
-        data = result.profiles[result.indexToView] || result.profiles[0];
-
-        if (!data) {
-            rejectData('CPU profile data not found');
+        if (isV8LogProfile(profiles[0]) || isCPUProfile(profiles[0])) {
+            inputProfiles = {
+                profiles
+            };
         }
-    } else if (isV8Log(data)) {
-        data = convertV8LogIntoCpuprofile(data);
+    } else if (isV8LogProfile(data) || isCPUProfile(data)) {
+        inputProfiles = {
+            profiles: [data]
+        };
+    } else {
+        rejectData('Unknown format');
+        throw new Error('Unknown format');
     }
 
-    // if (isCPUProfileMerge(data)) {
-    //     return {
-    //         ...data.profiles[2],
-    //         nodes: data.nodes,
-    //         profiles: data.profiles
-    //     };
-    // }
-
-    if (!isCPUProfile(data)) {
-        rejectData('Bad format', {
-            view: 'alert-warning',
-            content: [
-                { view: 'h3', content: [
-                    'badge:"Error"',
-                    'text:"Bad format"'
-                ] },
-                { view: 'md', source: [
-                    'CPU (pro)file supports the following formats:',
+    const result: V8CpuProfileSet = {
+        indexToView: inputProfiles?.indexToView || 0,
+        profiles: []
+    };
+    for (let profile of inputProfiles?.profiles || []) {
+        if (isV8LogProfile(profile)) {
+            result.profiles.push(convertV8LogIntoCpuProfile(profile));
+        } else if (isCPUProfile(profile)) {
+            profile = unrollHeadToNodesIfNeeded(profile);
+            profile = unwrapSamplesIfNeeded(profile);
+            convertParentIntoChildrenIfNeeded(profile);
+            Object.assign(profile, extensions);
+            result.profiles.push(profile);
+        } else {
+            rejectData('Bad format', {
+                view: 'md', source: [
+                    'CPUpro supports the following formats:',
                     ...supportedFormats
-                ] }
-            ]
-        });
+                ]
+            });
+
+            throw new Error('Bad format');
+        }
     }
 
-    convertParentIntoChildrenIfNeeded(data);
-    Object.assign(data, extensions);
+    if (result.profiles.length === 0) {
+        rejectData('CPU profiles not found');
+    }
 
-    return data;
+    if (!FEATURE_MULTI_PROFILES) {
+        // return only the first profile until multi-profile mode is fully implemented
+        return {
+            ...result,
+            profiles: result.profiles.slice(0, 1)
+        };
+    }
+
+    return result;
 }

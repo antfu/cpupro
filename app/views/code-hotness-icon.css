@@ -1,0 +1,65 @@
+.view-code-hotness-icon {
+    --color: #4c4c4c;
+    display: inline-block;
+    height: 13.5px;
+    vertical-align: text-bottom;
+    color: var(--color);
+    white-space: nowrap;
+}
+.view-code-hotness-icon.discovery-view-has-tooltip:hover {
+    background-color: #8884;
+    box-shadow: 0 0 0 3px #8884;
+    border-radius: 1px;
+}
+.view-table-cell > .view-code-hotness-icon:only-child {
+    margin: 0px -5px;
+}
+.view-page-header__content .view-code-hotness-icon {
+    position: absolute;
+    height: 2em;
+    margin-top: 13px;
+    margin-left: -32px;
+}
+.view-page-header__content .view-code-hotness-icon::before {
+    height: 1.75em;
+}
+
+.view-code-hotness-icon[data-label]::after {
+    content: attr(data-label);
+    display: inline-block;
+    vertical-align: top;
+    line-height: 13px;
+    padding-left: 2px;
+}
+
+.view-code-hotness-icon::before {
+    content: '';
+    display: inline-block;
+    vertical-align: top;
+    mask: url("../img/hotness.svg");
+    mask-size: cover;
+    height: 13px;
+    background-color: var(--color, #4c4c4c);
+    aspect-ratio: 1;
+}
+
+.view-code-hotness-icon.hotness-cold {
+    --color: #999999;
+}
+.view-code-hotness-icon.hotness-warm {
+    --color: #ab9461;
+}
+.view-code-hotness-icon.hotness-hot[data-tier="Maglev"] {
+    --color: #ba8932;
+}
+.view-code-hotness-icon.hotness-hot {
+    --color: #c95e5e;
+}
+
+.view-code-hotness-icon__tooltip {
+    padding: 12px 16px 6px;
+}
+.view-code-hotness-icon__tooltip p,
+.view-code-hotness-icon__tooltip ul {
+    margin: .5em 0 !important;
+}

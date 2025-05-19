@@ -5,11 +5,18 @@ export const parseAddress = parseInt; // useBigInt ? BigInt : parseInt;
 
 export function parseState(state: string) {
     switch (state) {
-        case '':  return CodeState.COMPILED;
-        case '~': return CodeState.IGNITION;
-        case '^': return CodeState.SPARKPLUG;
-        case '+': return CodeState.MAGLEV;
-        case '*': return CodeState.TURBOFAN;
+        case '':
+            return CodeState.COMPILED;
+        case '~':
+            return CodeState.IGNITION;
+        case '^':
+            return CodeState.SPARKPLUG;
+        case '+':
+        case '+\'': // context specialized
+            return CodeState.MAGLEV;
+        case '*':
+        case '*\'': // context specialized
+            return CodeState.TURBOFAN;
     }
 
     throw new Error(`Unknown code state: ${state}`);
@@ -17,7 +24,7 @@ export function parseState(state: string) {
 
 export function kindFromState(state: CodeState) {
     switch (state) {
-        case CodeState.COMPILED: return 'Buildin';
+        case CodeState.COMPILED: return 'Builtin';
         case CodeState.IGNITION: return 'Unopt';
         case CodeState.SPARKPLUG: return 'Sparkplug';
         case CodeState.MAGLEV: return 'Maglev';
@@ -27,18 +34,47 @@ export function kindFromState(state: CodeState) {
     throw new Error(`Unknown code state: ${state}`);
 }
 
+// Make a copy of the sliced string to detach from input (parent) string
+const dummyObject = Object.create(null);
+export function detachSlicedString(str: string) {
+    if (str === '') {
+        return '';
+    }
+
+    // That's a hack to detach (make a copy of) the sliced string from its parent (source),
+    // so the parent can be GCed.
+    // To make a search across object's keys, the string must be internalizated (at least in V8).
+    // Using `in` operator enforces JS engine to internalizate the string.
+    // Probably, the internalization is not necessary for most of the strings and another approach
+    // that just make a copy should be choosen (like commented below), which a bit faster. However,
+    // internalization reduces memory footprint after GC on large log loading.
+    str in dummyObject;
+
+    return str;
+    // const tmp = str[0] + str.slice(1);
+    // x = tmp.charCodeAt(0);
+    // return tmp;
+}
+
 export function parseString(value: string) {
-    if (value.indexOf('\\') === -1) {
-        return value;
+    if (value === '' || value.indexOf('\\') === -1) {
+        return detachSlicedString(value);
     }
 
     const valueEnd = value.length;
     let result = '';
 
     for (let i = 0; i < valueEnd; i++) {
-        if (value[i] !== '\\') {
-            result += value[i];
-            continue;
+        const bidx = value.indexOf('\\', i);
+
+        if (bidx === -1) {
+            result += value.slice(i);
+            break;
+        }
+
+        if (bidx !== i) {
+            result += value.slice(i, bidx);
+            i = bidx;
         }
 
         if (i === valueEnd - 1) {
@@ -91,25 +127,63 @@ export function parseString(value: string) {
         }
     }
 
+    // This is a hack to flatten the concatenated string and detach its parts from the source strings,
+    // allowing them to be garbage collected.
+    // The JS engine requires a string to be represented as a single sequence of bytes (flattened)
+    // to perform complex operations like `regexp.test()`. The regex effectively does nothing,
+    // but compilers are unaware of this and cannot eliminate the `test()` call, which triggers flattening.
+    /^/.test(result);
+
     return result;
 }
 
-export function parseStack(pc: number, logStack: string[]) {
-    const parsedStack: number[] = [];
+export function parseStack(
+    pc: number,
+    func: number,
+    logStack: string[],
+    findCodeEntryByAddress: (address: number) => { id: number; start: number; } | null
+) {
+    const parsedStack: number[] = new Array(2 * (logStack.length + (func ? 2 : 1)));
+    let parsedStackCursor = 0;
+    const pushStackEntry = (address: number) => {
+        const codeEntry = findCodeEntryByAddress(address);
+
+        if (codeEntry !== null) {
+            parsedStack[parsedStackCursor++] = codeEntry.id;
+            parsedStack[parsedStackCursor++] = address - codeEntry.start;
+        } else {
+            parsedStack[parsedStackCursor++] = -1;
+            parsedStack[parsedStackCursor++] = address;
+        }
+    };
+
+    pushStackEntry(pc);
+
+    if (func) {
+        pushStackEntry(func);
+    }
 
     for (let i = 0; i < logStack.length; i++) {
         const frame = logStack[i];
-        const firstChar = frame[0];
-        if (firstChar === '+' || firstChar === '-') {
-            // An offset from the previous frame.
-            debugger;
-            parsedStack.push(pc += parseInt(frame));
-        // Filter out possible 'overflow' string.
-        } else if (firstChar !== 'o') {
-            parsedStack.push(parseInt(frame));
-        } else {
-            console.error(`Dropping unknown tick frame: ${frame}`);
+
+        switch (frame.charCodeAt(0)) {
+            case 43: // +
+            case 45: // -
+                pushStackEntry(pc += parseInt(frame));
+                break;
+
+            case 111: // o
+                // overflow frame – just ignore
+                // console.warn(`Dropping unknown tick frame: ${frame}`);
+                break;
+
+            default:
+                pushStackEntry(parseInt(frame));
         }
+    }
+
+    if (parsedStackCursor < parsedStack.length) {
+        parsedStack.length = parsedStackCursor;
     }
 
     return parsedStack;

@@ -1,0 +1,94 @@
+.all-page-header {
+    margin-bottom: -18px;
+}
+.all-page-header > .view-page-header__content {
+    margin-bottom: 21px;
+}
+
+.all-page-table {
+    min-width: 100%;
+    border-bottom: 1em solid transparent;
+}
+.all-page-table > thead {
+    top: 120px;
+    z-index: 101;
+}
+.all-page-table > thead .view-table-header-cell {
+    white-space: nowrap;
+}
+.all-page-table > thead .view-table-header-cell.timings {
+    min-width: 105px;
+    box-sizing: border-box;
+}
+.all-page-table > thead .view-table-header-cell.category {
+    min-width: 76px;
+    box-sizing: border-box;
+}
+.all-page-table > thead .view-table-header-cell:last-child {
+    width: 100%;
+}
+.all-page-table > tbody > .view-table-cell-details-row > .view-cell-details-content > .view-table > thead {
+    top: 168.5px;
+    z-index: 11;
+}
+.all-page-table > tbody > .view-table-row:has(+ .view-table-cell-details-row) {
+    position: sticky;
+    top: 144px;
+    z-index: 12;
+    background: var(--discovery-background-color);
+}
+.all-page-table > tbody > .view-table-cell-details-row ~ .view-table-row {
+    position: sticky;
+    top: 0px;
+}
+.all-page-table .view-call-frame-source .view-source__prelude {
+    position: sticky;
+    top: 168.5px;
+    z-index: 2;
+    background-color: rgb(53 53 53);
+    border-top: 1px solid var(--discovery-background-color);
+}
+.all-page-table .view-cell-details-content .view-call-frame-source {
+    margin-top: -1px !important;
+}
+
+.app-page-summary {
+    position: fixed;
+    z-index: 110;
+    inset: auto 0 0 0;
+    padding:
+        .5em
+        var(--discovery-page-padding-right)
+        .65em
+        var(--discovery-page-padding-left);
+    /* margin:
+        .5em
+        calc(-1 * var(--discovery-page-padding-right))
+        calc(-1 * var(--discovery-page-padding-bottom))
+        calc(-1 * var(--discovery-page-padding-left)); */
+
+    display: flex;
+    justify-content: center;
+
+    background-color: var(--discovery-background-color);
+    background-color: color-mix(in srgb, var(--discovery-background-color), rgba(0, 0, 0, .4) 10%);
+    box-shadow: 0 0 3px rgba(0, 0, 0, .5);
+    font-size: 90%;
+}
+.app-page-summary .view-text-numeric {
+    color: #9ea867;
+}
+.app-page-summary > .view-block {
+    display: flex;
+    gap: 1ex;
+    opacity: .9;
+}
+.app-page-summary > .view-block:not(:first-child)::before {
+    content: '';
+    display: inline-block;
+    align-self: center;
+    border-left: 1px solid #888b;
+    margin-left: calc(1ex + 5px);
+    padding-right: 5px;
+    height: 1em;
+}

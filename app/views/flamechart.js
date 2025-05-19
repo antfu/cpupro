@@ -1,6 +1,6 @@
-const { utils } = require('@discoveryjs/discovery');
-const { FlameChart } = require('./flamechart/index');
-const Tooltip = require('./flamechart/tooltip').default;
+import { utils } from '@discoveryjs/discovery';
+import { FlameChart } from './flamechart/index.js';
+import Tooltip from './flamechart/tooltip.js';
 
 function findFirstPageContentChild(el) {
     let cursor = el;
@@ -38,9 +38,18 @@ const defaultTooltipContent = [
             { when: 'marker("module")', content: [
                 'module-badge'
             ] },
-            { when: 'marker("function")', content: [
+            { when: 'marker("call-frame")', content: [
                 'module-badge:module',
-                { view: 'block', content: 'text:name' }
+                'call-frame-loc-badge',
+                { view: 'block', content: [
+                    {
+                        view: 'context',
+                        data: '#.data.currentProfile.codesByCallFrame[=> callFrame = @]',
+                        whenData: 'hotness = "hot" or hotness = "warm"',
+                        content: ['code-hotness-icon:topTier', 'text:" "']
+                    },
+                    'text:name'
+                ] }
             ] },
             { content: [
                 { view: 'block', content: 'text:name' }
@@ -72,9 +81,10 @@ const defaultDetailsContent = [
                 { when: 'marker("module")', content: [
                     'module-badge'
                 ] },
-                { when: 'marker("function")', content: [
+                { when: 'marker("call-frame")', content: [
                     'module-badge:module',
-                    { view: 'block', content: 'link:{ text: name, href: marker("function").href }' }
+                    'call-frame-loc-badge',
+                    { view: 'block', content: 'link:{ text: name, href: marker("call-frame").href }' }
                 ] },
                 { content: [
                     'badge:{ text: name, href: marker("category").href }'
@@ -188,7 +198,8 @@ discovery.view.define('flamechart', function(el, config, data, context) {
     `);
 
     const { selfTimes, nestedTimes } = timings;
-    const unsubscribeTimings = timings.on(utils.debounce(() => {
+    const unsubscribeTimings = timings.subscribe(utils.debounce(() => {
+        timings.recompute?.();
         chart.resetValues();
         renderDetails(true);
 
@@ -198,7 +209,9 @@ discovery.view.define('flamechart', function(el, config, data, context) {
     }, 16, { maxWait: 48 }));
 
     chart.setData(tree, {
-        name: value => value.name || value.packageRelPath,
+        name: value => value.kind === 'script'
+            ? `${value.name} ${value.module.packageRelPath || value.module.path}`
+            : value.name || value.packageRelPath,
         value: timingsMap
             ? nodeIndex => selfTimes[timingsMap[nodeIndex]] + nestedTimes[timingsMap[nodeIndex]]
             : nodeIndex => selfTimes[nodeIndex] + nestedTimes[nodeIndex],

@@ -1,4 +1,4 @@
-import { V8CpuProfileExecutionContext, V8CpuProfileScript } from '../types.js';
+import { RuntimeCode, V8CpuProfileExecutionContext, V8CpuProfileScript } from '../types.js';
 
 type Context = {
     origin: string;
@@ -12,7 +12,13 @@ type Script = {
 type TraceEvent = {
     [k: string]: unknown;
 };
-type DevToolsEnchandedTraces = {
+export type DevToolsEnchandedTraceEventsProfile = {
+    meta: {
+        version: number;
+        fileDocumentType: string;
+        userAgentVersion: string;
+        type: string;
+    }
     executionContexts: Context[];
     scripts?: Script[];
     payload: {
@@ -20,8 +26,8 @@ type DevToolsEnchandedTraces = {
     }
 };
 
-export function isDevToolsEnhancedTraces(data) {
-    const { meta } = data || {};
+export function isDevToolsEnhancedTraces(data: unknown): data is DevToolsEnchandedTraceEventsProfile {
+    const { meta } = data as Partial<DevToolsEnchandedTraceEventsProfile>;
 
     if (meta && meta.fileDocumentType === 'x-msedge-session-log' && meta.type === 'performance') {
         return true;
@@ -30,7 +36,7 @@ export function isDevToolsEnhancedTraces(data) {
     return false;
 }
 
-export function extractFromDevToolsEnhancedTraces(data: DevToolsEnchandedTraces) {
+export function extractFromDevToolsEnhancedTraces(data: DevToolsEnchandedTraceEventsProfile) {
     const scripts: V8CpuProfileScript[] = [];
     const executionContexts: V8CpuProfileExecutionContext[] = [];
 
@@ -55,7 +61,7 @@ export function extractFromDevToolsEnhancedTraces(data: DevToolsEnchandedTraces)
 
     const result = {
         ...data.payload,
-        runtime: 'edge', // FIXME: temporary solution, there is no way for now to detect Edge, however this format is supported by Edge only for now
+        runtime: 'edge' satisfies RuntimeCode as RuntimeCode, // FIXME: temporary solution, there is no way for now to detect Edge, however this format is supported by Edge only for now
         executionContexts,
         scripts
     };

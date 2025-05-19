@@ -1,4 +1,4 @@
-import { CallTree } from '../../prepare/call-tree';
+import { CallTree } from '../../prepare/computations/call-tree';
 import { generateColorVector, calculateColor } from './color-utils';
 import { EventEmitter } from './event-emmiter';
 
@@ -412,7 +412,7 @@ export class FlameChart<T> extends EventEmitter<Events> {
     }
 
     scheduleRender() {
-        if (this.#scheduleRenderTimer === null) {
+        if (this.el !== null && this.#scheduleRenderTimer === null) {
             const requestId = requestAnimationFrame(() => {
                 if (this.#scheduleRenderTimer === requestId) {
                     // const renderStart = Date.now();
@@ -434,7 +434,7 @@ export class FlameChart<T> extends EventEmitter<Events> {
         this.#syncChildrenComputations();
         this.#scheduleRenderTimer = null;
 
-        if (this.#width === 0 && this.#resizeObserver) {
+        if (this.el === null || (this.#width === 0 && this.#resizeObserver)) {
             return;
         }
 
@@ -616,6 +616,7 @@ export class FlameChart<T> extends EventEmitter<Events> {
     destroy() {
         this.emit('destroy');
 
+        this.#scheduleRenderTimer = null;
         this.resetFrameRefs();
 
         if (this.#resizeObserver) {

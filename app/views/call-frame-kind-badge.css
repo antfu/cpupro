@@ -1,0 +1,43 @@
+.view-badge.call-frame-kind {
+    --discovery-view-badge-dark-color: color-mix(in oklab, currentColor 12%, var(--discovery-background-color));
+
+    display: inline-block;
+    padding: 0.5px 4px 0px;
+    box-sizing: border-box;
+    min-width: 56px;
+    text-transform: uppercase;
+    font-size: 9px;
+    text-align: center;
+}
+.view-table-cell > .view-badge.call-frame-kind {
+    vertical-align: top;
+    margin: 0 -6px 0 -8px;
+}
+
+.view-badge.call-frame-kind.vm-state {
+    --discovery-view-badge-dark-text-color: #e29c7f;
+}
+.view-badge.call-frame-kind.script {
+    --discovery-view-badge-dark-text-color: #cfb282;
+}
+.view-badge.call-frame-kind.builtin {
+    --discovery-view-badge-dark-text-color: #bbb580;
+}
+.view-badge.call-frame-kind.ic {
+    --discovery-view-badge-dark-text-color: #aea6c3;
+}
+.view-badge.call-frame-kind.bytecode {
+    --discovery-view-badge-dark-text-color: #87b2a3;
+}
+.view-badge.call-frame-kind.cpp {
+    --discovery-view-badge-dark-text-color: #a4b7a3;
+}
+.view-badge.call-frame-kind.lib {
+    --discovery-view-badge-dark-text-color: #c6a3bc;
+}
+.view-badge.call-frame-kind.function {
+    --discovery-view-badge-dark-text-color: #a3bb80;
+}
+.view-badge.call-frame-kind.regexp {
+    --discovery-view-badge-dark-text-color: #85b3ed;
+}

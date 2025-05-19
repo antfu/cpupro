@@ -1,17 +1,68 @@
-import { PackageType, PackageRegistry, WellKnownName, WellKnownType, PackageProvider } from './types';
+import { PackageType, PackageRegistry, WellKnownName, WellKnownType, PackageProvider, V8FunctionCodeType, CpuProFunctionCodes, ModuleType } from './types';
 import { packageRegistryEndpoints } from './utils';
 
 export const TIMINGS = false;
 export const USE_WASM = true;
+export const FEATURE_MULTI_PROFILES = false;
 
 export const EMPTY_ARRAY = Object.freeze([]);
-export const maxRegExpLength = 65;
-export const wellKnownNodeName = new Map<WellKnownName, WellKnownType>([
+export const maxRegExpLength = 48;
+export const wellKnownCallFrameName = new Map<WellKnownName, WellKnownType>([
     ['(root)', 'root'],
     ['(program)', 'program'],
     ['(garbage collector)', 'gc'],
-    ['(idle)', 'idle']
+    ['(idle)', 'idle'],
+    ['(no samples)', 'no-samples'],
+    ['(parser)', 'parser'],
+    ['(bytecode compiler)', 'bytecode-compiler'],
+    ['(compiler)', 'compiler'],
+    ['(atomics wait)', 'atomics-wait']
 ]);
+export const moduleTypeByWellKnownName = new Map<WellKnownName, ModuleType>([
+    ['(root)', 'root'],
+    ['(program)', 'program'],
+    ['(garbage collector)', 'gc'],
+    ['(idle)', 'idle'],
+    ['(no samples)', 'unknown'],
+    ['(parser)', 'compilation'],
+    ['(bytecode compiler)', 'compilation'],
+    ['(compiler)', 'compilation'],
+    ['(atomics wait)', 'blocking']
+]);
+export const categories: Exclude<PackageType, 'webpack/runtime'>[] = [
+    'script',
+    'wasm',
+    'regexp',
+    'electron',
+    'deno',
+    'node',
+    'internals',
+    'program',
+    'devtools',
+    'chrome-extension',
+    'gc',
+    'compilation',
+    'blocking',
+    'root',
+    'idle',
+    'unknown'
+] as const;
+export const vmFunctionStateTiers: V8FunctionCodeType[] = [
+    'Unknown',
+    'Ignition',
+    'Sparkplug',
+    'Maglev',
+    'Turboprop', // Removed in 2022 https://issues.chromium.org/issues/42202499
+    'Turbofan'
+] as const;
+export const vmFunctionStateTierHotness: Record<V8FunctionCodeType, CpuProFunctionCodes['hotness']> = {
+    'Unknown': 'cold',
+    'Ignition': 'cold',
+    'Sparkplug': 'warm',
+    'Maglev': 'hot',
+    'Turboprop': 'hot',
+    'Turbofan': 'hot'
+} as const;
 
 export const knownChromeExtensions = {
     'fmkadmapgofadopljbjfkapdkoienihi': 'React Developer Tools',
@@ -53,7 +104,55 @@ export const knownRegistry: Record<string, PackageProvider> = {
     ) }
 };
 
-export const typeColor: Record<PackageType | PackageRegistry, string> = {
+export const allocTimespan = [
+    'alive',
+    'short-lived',
+    'long-lived'
+] as const;
+export const allocTypes = [
+    'hidden',
+    'array',
+    'string',
+    'object',
+    'code',
+    'closure',
+    'regexp',
+    'heap-number',
+    'native',
+    'synthetic',
+    'concat-string',
+    'sliced-string',
+    'symbol',
+    'bigint',
+    'object-shape',
+    'wasm-object'
+] as const;
+export const allocSpaces = [
+    'read_only_space',
+    'new_space',
+    'old_space',
+    'code_space',
+    'shared_space',
+    'lo_space',
+    'new_lo_space',
+    'code_lo_space',
+    'shared_lo_space'
+] as const;
+type AllocationTimespan = (typeof allocTimespan)[number];
+type AllocationType = (typeof allocTypes)[number];
+type AllocationSpace = (typeof allocSpaces)[number];
+
+// colors in order of apperiance in a list
+export const typeColor: Record<PackageType | PackageRegistry | V8FunctionCodeType | AllocationType | AllocationTimespan | AllocationSpace, string> = {
+    // FIXME: place part of alloc types here, because regexp alloc type clash with package type
+    'object-shape': '#ffffffa0',
+    'object': '#fee29ca0',
+    'array': '#ffee61a0',
+    'string': '#78b362a0',
+    'concat-string': '#78b362a0',
+    'sliced-string': '#78b362a0',
+    // ----
+
     'script': '#fee29ca0',
     'npm': '#f98e94a0',
     'github': '#666666a0',
@@ -66,13 +165,50 @@ export const typeColor: Record<PackageType | PackageRegistry, string> = {
     'node': '#78b362a0',
     'internals': '#fcb69aa0',
     'program': '#edfdd1a0',
+    'devtools': '#90d7f3a0',
     'chrome-extension': '#7dfacda0',
     'webpack/runtime': '#888888a0',
     'gc': '#f1b6fda0',
-    'engine': '#fc9a9aa0',
+    'compilation': '#fc9a9aa0',
+    'blocking': '#f2a376a0',
     'root': '#444444a0',
     'idle': '#888888a0',
-    'unknown': '#888888a0'
+    'unknown': '#888888a0',
+
+    // compiler tier
+    'Unknown': '#888888a0',
+    'Ignition': '#b9b9b9a0',
+    'Sparkplug': '#e3c685a0',
+    'Maglev': '#dba543a0',
+    'Turboprop': '#dba543a0',
+    'Turbofan': '#f78080a0',
+
+    // alloc types
+    // 'regexp': '#8db2f8a0',
+    'heap-number': '#65b4fda0',
+    'bigint': '#65b4fda0',
+    'closure': '#f2a376a0',
+    'code': '#fc9a9aa0',
+    'symbol': '#ffee61a0',
+    'wasm-object': '#9481ffa0',
+    'native': '#fcb69aa0',
+    'synthetic': '#fcb69aa0',
+    'hidden': '#888888a0',
+
+    // alloc timespan
+    'short-lived': '#fee29ca0',
+    'long-lived': '#f2a376a0',
+    'alive': '#78b362a0',
+
+    'new_space': '#fee29ca0',
+    'old_space': '#f2a376a0',
+    'code_space': '#fc9a9aa0',
+    'code_lo_space': '#fc9a9aa0',
+    'new_lo_space': '#fee29ca0',
+    'lo_space': '#f2a376a0',
+    'shared_space': '#fcb69aa0',
+    'shared_lo_space': '#fcb69aa0',
+    'read_only_space': '#fee29ca0'
 };
 export const typeColorComponents = Object.fromEntries(Object.entries(typeColor)
     .map(([type, color]) =>[type, [

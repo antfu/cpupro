@@ -28,7 +28,7 @@ discovery.view.define('subject-with-nested-timeline', {
                     $category,
                     color: name.color(),
                     $binTime,
-                    bins: #.data.categoriesTree.binCalls(=>($=$category and $selector($$)), $binCount),
+                    bins: #.currentProfile.categoriesTree.binCalls(=>($=$category and $selector($$)), $binCount),
                     $totalTimeBins
                 })
             )
@@ -40,16 +40,16 @@ discovery.view.define('subject-with-nested-timeline', {
             labels: 'top',
             duration: '=totalTime',
             segments: '=binCount',
-            selectionStart: '=#.data.samplesTimingsFiltered.rangeStart',
-            selectionEnd: '=#.data.samplesTimingsFiltered.rangeEnd',
+            selectionStart: '=#.currentProfile.samplesTimingsFiltered.rangeStart',
+            selectionEnd: '=#.currentProfile.samplesTimingsFiltered.rangeEnd',
             onChange: (state, name, el, data, context) => {
                 // console.log('change', state);
                 // const t = Date.now();
 
                 if (state.timeStart !== null) {
-                    context.data.samplesTimingsFiltered.setRange(state.timeStart, state.timeEnd);
+                    context.currentProfile.samplesTimingsFiltered.setRange(state.timeStart, state.timeEnd);
                 } else {
-                    context.data.samplesTimingsFiltered.resetRange();
+                    context.currentProfile.samplesTimingsFiltered.resetRange();
                 }
 
                 // console.log('compute timings', Date.now() - t);
@@ -86,6 +86,49 @@ discovery.view.define('subject-with-nested-timeline', {
                     }
                 }
             ]
+        },
+        {
+            view: 'list',
+            className: 'function-codes',
+            limit: false,
+            context: '{ ...#, binCount }',
+            data: `
+                $type: subject.marker().type;
+                $totalTime: #.currentProfile.totalTime;
+                $step: $totalTime / #.binCount;
+
+                #.currentProfile
+                    | $type = "module"     ? codesByScript[=> script = @.subject.script].compilation.codes :
+                      $type = "call-frame" ? codesByCallFrame[=> callFrame = @.subject].codes :
+                    | .({
+                        code: $,
+                        color: tier.color(true),
+                        duration: duration
+                            or ($lastSeen: (module or callFrame).timestamps($type).lastSeen;
+                                $lastSeen > tm ? $step * ($lastSeen / $step).ceil() - tm)
+                            or $totalTime - tm
+                    })
+            `,
+            whenData: true,
+            itemConfig: {
+                view: 'block',
+                className: 'tick',
+                tooltip: [
+                    'html:code | `<span style=\"color:${tier.color()[:-2]+`d0`}\">${tier}</span><br>`',
+                    'text:`Duration: ${duration.ms()}`'
+                ],
+                postRender(el, _, data, ctx) {
+                    const { code, color, duration } = data;
+                    const totalTime = ctx.currentProfile.totalTime;
+
+                    el.style.setProperty('--pos', code.tm / totalTime);
+                    el.style.setProperty('--duration', duration / totalTime);
+                    el.style.setProperty('--tier-color', 'rgb(' + color + ', .68)');
+                    // el.addEventListener('click', () => {
+                    //     ctx.currentProfile.samplesTimingsFiltered.setRange(code.tm, code.tm + duration);
+                    // });
+                }
+            }
         },
         {
             view: 'timeline-segments-bin',

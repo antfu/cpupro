@@ -1,5 +1,11 @@
 {
+    "include": [
+        "app/**/*.ts",
+        "app/**/*.mts"
+    ],
     "compilerOptions": {
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
         "lib": ["ES2022", "dom"],
         "target": "ES2022",
         "allowJs": true,

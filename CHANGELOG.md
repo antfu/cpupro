@@ -1,8 +1,46 @@
+## 0.7.0 (2025-05-08)
+
+- Added raw V8 log format support
+- Added gzip and deflate compressed profile support
+- Added code state histogram on the entry page
+- Added heap size histogram on the entry page
+- Added code tier intervals indicator on the timeline in call frame and module pages
+- Added source code display on module and call frame pages, annotated with self and nested time badges, inline and deopt badges
+- Added code states table with tier, inline, and deopt details
+- Enhanced All Call Frames table with additional columns (source, code states, deopt count), expandable for inline code and code states
+- Added hotness indicator in most UI call frame listings
+- Added expanded state persistence for expandable blocks during the session
+- Fixed edge cases in call stack processing for precise sample locations
+- Many other improvements and fixes
+
+## 0.6.0 (2025-01-14)
+
+- Viewer
+    - Changed terminology in accordance with that adopted in V8; the main term is now **call frame** (JS/Wasm function, RegExp, VM state, native handler, etc.) instead of "function"
+    - Added "All call frames," "All modules," and "All packages" pages, which display entries even if they have no samples (when a profile provides data about compiled functions, such as a V8 log)
+    - Added an option to consolidate call frames (a "Consolidate call frames" checkbox, checked by default) to the "Nested call sites" tree on the call frame page
+    - Added call frame consolidation in a call frame's nested calls flame chart on the call frame page
+    - Added call tree updates on filter changes on the call frame page
+    - Added a `kind` property for call frames, which can be `script`, `function`, `regexp`, `vm-state`, or `root`
+    - Reworked tables on the `category`, `package`, and `module` pages to include records with no samples and show the number of nested subjects (e.g., modules or call frames for a package) as `sampled / all`
+    - Reworked the data model in preparation for multi-profile analysis and comparison
+    - Reworked profile data preprocessing and initial profile computations
+    - Introduced a shared dictionary for call frames, scripts, modules, packages, etc., to be used across a set of profiles
+    - Introduced an optional call frame positions tree and related structures for source code position precision timings
+    - Improved parsing of function names and URLs during the conversion of preprocessed V8 logs into cpuprofile
+    - Changed line and column numbers to be zero-based during the conversion of preprocessed V8 logs into cpuprofile
+    - Limited the display of very long regular expressions in the function page header to the first 256 characters
+    - Replaced the `engine` category with `compilation` (covering parsers and compilers) and `blocking` (atomic waits) categories
+    - Added a `devtools` category for scripts injected by a runtime for debugging purposes, such as those added by VS Code for scripts run from the "Run and Debug" panel
+    - Fixed processing of `v8/gc` call frames that appear when Node.js is run with `--expose-gc` and `global.gc()` is invoked (added to `internals`)
+    - Various fixes and improvements
+
 ## 0.5.1 (2024-05-10)
 
-- Added transformation from `parent` to `children` for call tree nodes for `.cpuprofile` files if needed (fixes #5)
-- Implemented exclusion of ending no-sample time. For certain profiles, the time from the last sample until `endTime` can be significant, indicating the conclusion of the profiling session or adjustments from excluding idle samples at the end. This time is now excluded from the `Profiling time` which used for computing time percentages
-- Fixed double rendering of the page after the profile data is loaded
+- Viewer
+    - Added transformation from `parent` to `children` for call tree nodes for `.cpuprofile` files if needed (fixes #5)
+    - Implemented exclusion of ending no-sample time. For certain profiles, the time from the last sample until `endTime` can be significant, indicating the conclusion of the profiling session or adjustments from excluding idle samples at the end. This time is now excluded from the `Profiling time` which used for computing time percentages
+    - Fixed double rendering of the page after the profile data is loaded
 
 ## 0.5.0 (2024-05-09)
 

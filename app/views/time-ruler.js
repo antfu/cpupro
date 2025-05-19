@@ -91,6 +91,18 @@ function createState(duration, segments, selectionStart = null, selectionEnd = n
     };
 }
 
+function discardCurrentView() {
+    if (currentViewEl) {
+        detailsTooltip.hide();
+
+        if (currentViewEl.dataset.state !== SELECTION_SELECTED) {
+            currentViewEl.dataset.state = SELECTION_NONE;
+        }
+
+        currentViewEl = null;
+    }
+}
+
 function getRulerFractionForPoint(timeRulerEl, x) {
     const { segments, state: currentState } = viewByEl.get(timeRulerEl);
     const rect = timeRulerEl.getBoundingClientRect();
@@ -206,11 +218,15 @@ discovery.addHostElEventListener('selectstart', (e) => {
     }
 }, true);
 
+// discard the current ruler when the pointer leaves the document;
+// this has no effect when selection mode is active, as currentView is capturing pointer events
+discovery.addGlobalEventListener('pointerleave', discardCurrentView, true);
+
 // track pointer pointer buttons
 discovery.addGlobalEventListener('pointerup', () => {
     // cancel selection if not started
     startSelectingRange = null;
-});
+}, true);
 discovery.addHostElEventListener('pointerdown', ({ buttons, pointerId, x, y, target }) => {
     // do nothing when not over a time-ruler element or not a main button is pressed
     if (currentViewEl === null || (buttons & 1) === 0) {
@@ -324,16 +340,22 @@ utils.pointerXY.subscribe(({ x, y }) => {
     } else if (currentViewEl) {
         // there is no time-ruler element under the pointer that met the conditions,
         // but we had such previously, so hide its details popup and reset the state if needed
-        detailsTooltip.hide();
-
-        if (currentViewEl.dataset.state !== SELECTION_SELECTED) {
-            currentViewEl.dataset.state = SELECTION_NONE;
-        }
+        discardCurrentView();
     }
 
     // remember time-ruler element as current if any
     currentViewEl = timeRulerEl;
 });
+
+function formatMemory(size, total) {
+    switch (true) {
+        case total < 1_000_000:
+            return `${(size / 1_000).toFixed(1).replace(/\.0$/, '')}Kb`;
+
+        default:
+            return `${(size / 1_000_000).toFixed(1).replace(/\.0$/, '')}Mb`;
+    }
+}
 
 discovery.view.define('time-ruler', function(el, options, data, context) {
     const {
@@ -341,6 +363,7 @@ discovery.view.define('time-ruler', function(el, options, data, context) {
         segments: segmentsRaw,
         selectionStart = null,
         selectionEnd = null,
+        valueType = context.currentProfile?.type || 'time',
         labels = 'top',
         name = 'ruler',
         details,
@@ -394,7 +417,9 @@ discovery.view.define('time-ruler', function(el, options, data, context) {
 
         intervalMarkerEl.className = 'interval-marker';
         intervalMarkerEl.style.setProperty('--offset', time / duration);
-        intervalMarkerEl.dataset.title = formatMicrosecondsTime(time, duration);
+        intervalMarkerEl.dataset.title = valueType === 'memory'
+            ? formatMemory(time, duration)
+            : formatMicrosecondsTime(time, duration);
     }
 
     // overlay element

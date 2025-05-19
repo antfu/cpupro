@@ -1,0 +1,23 @@
+.page-call-frame .view-page-header__prelude .call-frame-loc {
+    padding: 3px 6px;
+    color: #aaa;
+}
+.page-call-frame .view-page-header__content .view-source {
+    margin: 8px 0 1px;
+}
+.page-call-frame .view-page-header__content .view-source__content {
+    padding-top: 11px;
+    padding-bottom: 12px;
+}
+.page-call-frame .view-page-header__content .view-source__source {
+    font-size: 16px;    
+}
+.page-call-frame .view-page-header__content .view-source.too-long .view-source__source {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.page-call-frame .call-frame-codes > .content {
+    margin-right: calc(-1 * var(--discovery-page-padding-right));
+    overflow-x: auto;
+    overflow-y: hidden;
+}

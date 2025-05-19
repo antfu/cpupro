@@ -1,12 +1,14 @@
 // See: https://github.com/v8/v8/blob/master/src/inspector/js_protocol.json
 
-type ChromiumTimeline = {
-    traceEvents: ChromiumTimelineEvent[]
+import type { V8CpuProfile, V8CpuProfileSet } from '../types.js';
+
+export type ChromiumTraceEventsProfile = {
+    traceEvents: ChromiumTraceEvent[]
 } & {
     [key: string]: unknown;
 };
 
-interface ChromiumTimelineEvent {
+interface ChromiumTraceEvent {
     pid: number;
     tid: number;
     ts: number;
@@ -21,43 +23,7 @@ interface ChromiumTimelineEvent {
     id?: string;
 }
 
-interface PositionTickInfo {
-    line: number;
-    ticks: number;
-}
-
-interface CPUProfileCallFrame {
-    columnNumber: number;
-    functionName: string;
-    lineNumber: number;
-    scriptId: string;
-    url: string;
-}
-
-interface ProfileGroup {
-    indexToView: number;
-    profiles: CPUProfile[];
-}
-
-export interface CPUProfileNode {
-    callFrame: CPUProfileCallFrame;
-    hitCount: number;
-    id: number;
-    children?: number[];
-    positionTicks?: PositionTickInfo[];
-    parent?: number;
-}
-
-export interface CPUProfile {
-    name: string;
-    startTime: number;
-    endTime: number;
-    nodes: CPUProfileNode[];
-    samples: number[];
-    timeDeltas: number[];
-}
-
-export function isChromiumPerformanceProfile(data: unknown): boolean {
+export function isChromiumPerformanceProfile(data: unknown): data is ChromiumTraceEventsProfile {
     if (!Array.isArray(data)) {
         // JSON Object Format
         return typeof data === 'object' && data !== null && 'traceEvents' in data
@@ -79,14 +45,15 @@ export function isChromiumPerformanceProfile(data: unknown): boolean {
 }
 
 export function extractFromChromiumPerformanceProfile(
-    events: ChromiumTimeline | ChromiumTimelineEvent[]
-): ProfileGroup {
+    events: ChromiumTraceEventsProfile | ChromiumTraceEvent[]
+): V8CpuProfileSet {
     // It seems like sometimes Chrome timeline files contain multiple CpuProfiles?
     // For now, choose the first one in the list.
-    const cpuProfileById = new Map<string, CPUProfile>();
+    const cpuProfileById = new Map<string, V8CpuProfile>();
 
     // Maps pid/tid pairs to thread names
     const processNameId = new Map<number, string>();
+    const threadNameId = new Map<number, string>();
 
     // JSON Object Format
     if ('traceEvents' in events) {
@@ -100,7 +67,8 @@ export function extractFromChromiumPerformanceProfile(
             e.name === 'CpuProfile' ||
             e.name === 'Profile' ||
             e.name === 'ProfileChunk' ||
-            e.name === 'process_name'
+            e.name === 'process_name' ||
+            e.name === 'thread_name'
         )
         .sort((a, b) => a.ts - b.ts);
 
@@ -108,7 +76,7 @@ export function extractFromChromiumPerformanceProfile(
         if (event.name === 'CpuProfile') {
             // Create an arbitrary profile id.
             const profileId = `${event.pid}:0x1`;
-            const profile = event.args.data.cpuProfile as CPUProfile;
+            const profile = event.args.data.cpuProfile as V8CpuProfile;
 
             cpuProfileById.set(profileId, profile);
             // profile.threadId = event.tid;
@@ -117,7 +85,7 @@ export function extractFromChromiumPerformanceProfile(
         if (event.name === 'Profile') {
             const profileId = `${event.pid}:${event.id}`;
             const profile = {
-                name: null,
+                _name: threadNameId.get(event.tid) || null,
                 startTime: 0,
                 endTime: 0,
                 nodes: [],
@@ -128,6 +96,10 @@ export function extractFromChromiumPerformanceProfile(
             // profile.threadId = event.tid;
 
             cpuProfileById.set(profileId, profile);
+        }
+
+        if (event.name === 'thread_name') {
+            threadNameId.set(event.tid, event.args.name);
         }
 
         if (event.name === 'process_name') {
@@ -174,23 +146,14 @@ export function extractFromChromiumPerformanceProfile(
         throw new Error('Could not find CPU profile in Timeline');
     }
 
-    const profiles: CPUProfile[] = [];
+    const profiles: V8CpuProfile[] = [];
     let indexToView = -1;
 
     for (const [profileId, profile] of cpuProfileById) {
         const processName: string | null = processNameId.get(parseInt(profileId)) || 'Unknown';
 
-        profile.name = processName;
-
         if (processName === 'CrRendererMain') {
             indexToView = profiles.length;
-        }
-
-        if (!profile.endTime && profile.timeDeltas) {
-            profile.endTime = profile.timeDeltas.reduce(
-                (x, y) => x + y,
-                profile.startTime
-            );
         }
 
         profiles.push(profile);

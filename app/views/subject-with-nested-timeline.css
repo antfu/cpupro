@@ -37,16 +37,17 @@
     content: "Nested time distributed by category";
     display: block;
     margin-left: 1px;
+    padding: 2px 0;
     font-size: 10px;
     text-align: center;
     background-color: #0004;
-    color: color-mix(in srgb, var(--discovery-color) 60%, var(--discovery-background-color));
+    color: color-mix(in srgb, var(--discovery-color) 80%, var(--discovery-background-color));
     opacity: .5;
     pointer-events: none;
 }
 .view-subject-with-nested-timeline .nested-work .view-timeline-segments {
     border-top: none;
-    /* transform: scaleY(-1); */
+    transform: scaleY(-1);
     margin-block: 0;
 }
 .view-subject-with-nested-timeline .view-timeline-segments-bin.nested-time {
@@ -72,10 +73,51 @@
     background-color: color-mix(in srgb, var(--discovery-color) 10%, var(--discovery-background-color));
 }
 .view-subject-with-nested-timeline > .view-timeline-segments-bin.self-time::before {
-    bottom: -.5px;
     padding-left: .5px;
 }
 .view-subject-with-nested-timeline > .view-timeline-segments-bin.nested-time::before {
     content: "NEST";
     transform: rotate(-90deg) scaleX(-1) translate(-100%);
+}
+
+/**
+* Function codes
+**/
+.view-subject-with-nested-timeline .function-codes {
+    position: absolute;
+    inset: -8.5px 0 auto;
+    height: 7.5px;
+    margin-left: 1px;
+    pointer-events: none;
+    contain: paint;
+    z-index: 1;
+}
+.view-subject-with-nested-timeline .function-codes .tick {
+    --tier-color: #aaaaaaa0;
+    position: absolute;
+    box-sizing: border-box;
+    top: 0;
+    left: calc(100% * var(--pos));
+    height: 7.5px;
+    border-left: .75px solid var(--tier-color);
+    border-color: color(from var(--tier-color) srgb r g b / 1);
+    border-right: .5px solid transparent;
+    width: calc(100% * var(--duration));
+    pointer-events: all;
+}
+.view-subject-with-nested-timeline .function-codes .tick::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-top: 3px solid transparent;
+    border-color: color-mix(in srgb, var(--tier-color) 20%, var(--discovery-background-color));
+    height: 1.5px;
+    bottom: auto;
+    background-color: var(--tier-color);
+    transition: 150ms ease-in;
+    transition-property: border-top-width, height;
+}
+.view-subject-with-nested-timeline .function-codes .tick:hover::before {
+    border-top-width: 2px;
+    height: 3.5px;
 }

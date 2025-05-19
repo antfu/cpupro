@@ -12,25 +12,28 @@ function formatDuration(time) {
     return `${number}${delim}`;
 }
 
-discovery.view.define('duration', function(el, config, { time, total }) {
+discovery.view.define('duration', function(el, config, data, context) {
+    const { time, total } = typeof data === 'number' ? { time: data } : data;
     const timeEl = document.createElement('span');
 
-    timeEl.className = 'time';
+    timeEl.className = context.data?.currentProfile?.type || 'time';
     timeEl.innerHTML = formatDuration(time);
 
     el.append(timeEl);
 
-    const fractionEl = document.createElement('span');
-    const fraction = 100 * time / total;
+    if (total) {
+        const fractionEl = document.createElement('span');
+        const fraction = 100 * time / total;
 
-    fractionEl.className = 'fraction';
-    fractionEl.innerText = fraction === 0
-        ? ''
-        : fraction < 0.1
-            ? '<0.1%'
-            : fraction >= 99.9
-                ? Math.round(fraction) + '%'
-                : fraction.toFixed(1) + '%';
+        fractionEl.className = 'fraction';
+        fractionEl.innerText = fraction === 0
+            ? ''
+            : fraction < 0.1
+                ? '<0.1%'
+                : fraction >= 99.9
+                    ? Math.round(fraction) + '%'
+                    : fraction.toFixed(1) + '%';
 
-    el.append(fractionEl);
+        el.append(fractionEl);
+    }
 });

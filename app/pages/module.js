@@ -1,128 +1,159 @@
-const pageContent = {
-    content: [
-        {
-            view: 'page-header',
-            prelude: [
-                'badge{ className: "type-badge", text: "Module" }',
-                'badge{ className: "category-badge", text: category.name, href: category.marker().href, color: category.name.color() }',
-                'package-badge'
-            ],
-            content: 'h1:packageRelPath or name or path'
-        },
+import { sessionExpandState, timingCols } from './common.js';
 
-        {
-            view: 'subject-with-nested-timeline',
-            data: '{ subject: @, tree: #.data.modulesTree }'
-        },
+const pageContent = [
+    {
+        view: 'page-header',
+        prelude: [
+            'badge{ className: "type-badge", text: "Module" }',
+            'badge{ className: "category-badge", text: category.name, href: category.marker().href, color: category.name.color() }',
+            'package-badge'
+        ],
+        content: 'h1:packageRelPath or name or path'
+    },
 
-        {
-            view: 'update-on-timings-change',
-            timings: '=#.data.modulesTimingsFiltered',
-            content: {
-                view: 'page-indicator-timings',
-                data: `{
-                    full: #.data.modulesTimings.entries[=>entry = @],
-                    filtered: #.data.modulesTimingsFiltered.entries[=>entry = @]
-                }`
+    {
+        view: 'subject-with-nested-timeline',
+        data: '{ subject: @, tree: #.currentProfile.modulesTree }'
+    },
+
+    {
+        view: 'update-on-timings-change',
+        timings: '=#.currentProfile.modulesTimingsFiltered',
+        content: `page-indicator-timings:{
+            full: #.currentProfile.modulesTimings.entries[=>entry = @],
+            filtered: #.currentProfile.modulesTimingsFiltered.entries[=>entry = @]
+        }`
+    },
+
+    {
+        view: 'expand',
+        className: 'trigger-outside script-source',
+        context: '{ ...#, currentScript: script }',
+        expanded: '=#.currentScript.hasSource() and "getSessionSetting".callAction("cpupro-module-source", false)',
+        onToggle: '==>#.currentScript.hasSource() and "setSessionSetting".callAction("cpupro-module-source", $)',
+        header: [
+            'text:"Source"',
+            { view: 'block', className: 'text-divider' },
+            { view: 'switch', content: [
+                { when: 'script.hasSource()', content: 'html:`<span style="color: #888">${script.source.size().bytes(true)}</html>`' },
+                { content: 'html:`<span style="color: #888">(unavailable)</span>`' }
+            ] }
+        ],
+        content: 'script-source:script'
+    },
+
+    {
+        view: 'expand',
+        ...sessionExpandState('module-nested-time-distribution', false),
+        className: 'trigger-outside',
+        header: [
+            'text:"Nested time distribution"',
+            { view: 'block', className: 'text-divider' },
+            {
+                view: 'update-on-timings-change',
+                timings: '=#.currentProfile.modulesTimingsFiltered',
+                content: 'duration:#.currentProfile.modulesTimingsFiltered.entries[=>entry=@].nestedTime'
             }
-        },
+        ],
+        content: `nested-timings-tree:{
+            subject: @,
+            tree: #.currentProfile.modulesTree,
+            timings: #.currentProfile.modulesTimingsFiltered
+        }`
+    },
 
-        {
-            view: 'expand',
-            when: false,
-            className: 'trigger-outside script-source',
-            data: '#.data.scripts[=> module = @]',
-            expanded: '=source is not undefined',
-            header: [
-                'text:"Source"',
-                { view: 'switch', content: [
-                    { when: 'source is not undefined', content: 'html:` \xa0<span style="color: #888">${source.size().bytes(true)}</html>`' },
-                    { content: 'html:` <span style="color: #888">(unavailable)</span>`' }
-                ] }
-            ],
-            content: `source:{
-                syntax: "js",
-                content: source | is string ? replace(/\\n$/, "") : "// source is unavailable",
-                refs: functions.({
-                    className: 'function',
-                    range: [start, end],
-                    marker: states | size() = 1
-                        ? tier[].abbr()
-                        : size() <= 3
-                            ? tier.(abbr()).join(' ')
-                            : tier[].abbr() + ' … ' + tier[-1].abbr(),
-                    tooltipData: { states, function },
-                    tooltip: [
-                        'text:tooltipData.function.name',
-                        'html:"<br>"',
+    {
+        view: 'expand',
+        ...sessionExpandState('module-call-frames', true),
+        className: 'trigger-outside',
+        header: [
+            'text:"Call frames "',
+            {
+                view: 'update-on-timings-change',
+                data: '#.currentProfile.callFramesTimingsFiltered.entries.[entry.module = @]',
+                timings: '=#.currentProfile.callFramesTimingsFiltered',
+                content: 'sampled-count-total{ count(=> totalTime?), total: size() }'
+            }
+        ],
+        content: {
+            view: 'content-filter',
+            className: 'table-content-filter',
+            data: `
+                #.currentProfile.callFramesTimingsFiltered.entries.[entry.module = @]
+                    .zip(=> entry, #.currentProfile.codesByCallFrame, => callFrame)
+                    .({
+                        $entry: left.entry;
+
+                        ...,
+                        $entry,
+                        name: $entry.name,
+                        moduleName: $entry.module.name,
+                        loc: $entry.loc
+                    })
+            `,
+            content: {
+                view: 'update-on-timings-change',
+                timings: '=#.currentProfile.callFramesTimingsFiltered',
+                content: {
+                    view: 'table',
+                    data: `
+                        .[name ~= #.filter]
+                        .({
+                            ...,
+                            selfTime: left.selfTime,
+                            nestedTime: left.nestedTime,
+                            totalTime: left.totalTime
+                        })
+                        .sort(selfTime desc, totalTime desc, loc ascN)
+                    `,
+                    cols: [
+                        ...timingCols,
                         {
-                            view: 'inline-list',
-                            data: 'tooltipData.states',
-                            item: 'text:"\xa0→ " + tier + (inlined ? " (inlined: " + fns.size() + ")" : "")'
+                            header: '',
+                            colWhen: '$[=>right]',
+                            sorting: 'right.hotness | $ = "hot" ? 3 : $ = "warm" ? 2 : $ = "cold" ? 1 : 0 desc',
+                            data: 'right',
+                            contentWhen: 'hotness = "hot" or hotness = "warm"',
+                            content: 'code-hotness-icon:topTier'
+                        },
+                        { header: 'Call frame',
+                            className: 'subject-name',
+                            sorting: 'name ascN',
+                            content: {
+                                view: 'badge',
+                                data: 'entry.marker() | { text: title, href, match: #.filter }',
+                                content: 'text-match'
+                            }
+                        },
+                        { header: 'Loc',
+                            sorting: 'loc ascN',
+                            data: 'entry',
+                            content: ['module-badge', 'call-frame-loc-badge']
                         }
                     ]
-                })
-            }`
-        },
-
-        {
-            view: 'expand',
-            expanded: true,
-            className: 'trigger-outside',
-            header: 'text:"Nested time distribution"',
-            content: 'nested-timings-tree:{ subject: @, tree: #.data.modulesTree, timings: #.data.modulesTimingsFiltered }'
-        },
-
-        {
-            view: 'expand',
-            expanded: true,
-            className: 'trigger-outside',
-            header: [
-                'text:"Functions "',
-                { view: 'pill-badge', content: {
-                    view: 'update-on-timings-change',
-                    timings: '=#.data.functionsTimingsFiltered',
-                    content: 'text-numeric:#.data.functionsTimingsFiltered.entries.[totalTime and entry.module = @].size()'
-                } }
-            ],
-            content: {
-                view: 'content-filter',
-                className: 'table-content-filter',
-                content: {
-                    view: 'update-on-timings-change',
-                    timings: '=#.data.functionsTimingsFiltered',
-                    content: {
-                        view: 'table',
-                        data: '#.data.functionsTimingsFiltered.entries.[totalTime and entry.module = @ and entry.name ~= #.filter].sort(selfTime desc, totalTime desc)',
-                        cols: [
-                            { header: 'Self time', sorting: 'selfTime desc, totalTime desc', content: 'duration:{ time: selfTime, total: #.data.totalTime }' },
-                            { header: 'Nested time', sorting: 'nestedTime desc, totalTime desc', content: 'duration:{ time: nestedTime, total: #.data.totalTime }' },
-                            { header: 'Total time', sorting: 'totalTime desc, selfTime desc', content: 'duration:{ time: totalTime, total: #.data.totalTime }' },
-                            { header: 'Function', sorting: 'entry.name ascN', content: 'auto-link{ data: entry, content: "text-match:{ ..., match: #.filter }" }' },
-                            { header: 'Loc', data: 'entry', sorting: 'entry.loc ascN', content: ['module-badge', 'loc-badge'] }
-                        ]
-                    }
                 }
             }
-        },
-
-        {
-            view: 'flamechart-expand',
-            tree: '=#.data.modulesTree',
-            timings: '=#.data.modulesTreeTimingsFiltered',
-            value: '='
         }
-    ]
-};
+    },
+
+    {
+        view: 'flamechart-expand',
+        ...sessionExpandState('module-flame-graphs', true),
+        tree: '=#.currentProfile.modulesTree',
+        timings: '=#.currentProfile.modulesTreeTimingsFiltered',
+        value: '='
+    }
+];
 
 discovery.page.define('module', {
     view: 'switch',
-    data: 'modules[=>id = +#.id]',
+    context: '{ ...#, currentProfile }',
+    data: 'currentProfile.modules[=>id = +#.id]',
     content: [
         { when: 'no $', content: {
             view: 'alert-warning',
             content: 'md:"No module with id \\"{{#.id}}\\" is found\\n\\n[Back to index page](#)"'
         } },
-        pageContent
+        { content: pageContent }
     ]
 });
